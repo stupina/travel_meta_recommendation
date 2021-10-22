@@ -1,3 +1,5 @@
+import os
+
 from argparse import ArgumentParser
 
 import pandas as pd
@@ -34,6 +36,7 @@ class TravelMetaRecomendation(object):
     Class provides methods for Motels.home to find maximum prices values
     """
     def __init__(self, bids_path, exchange_rate_path, motels_path):
+        self.directory = os.path.dirname(os.path.abspath(__file__))
         self.bids_path = bids_path
         self.exchange_rate_path = exchange_rate_path
         self.motels_path = motels_path
@@ -62,7 +65,29 @@ class TravelMetaRecomendation(object):
         return bids_df, rate_df, motels_df
 
     def filter_and_count_erros_in_bids(self):
-        pass
+        err_column = 'HU'
+        date_column = 'BidDate'
+        counts_column = 'Counts'
+        error_filter = self.bids_df[err_column].str.startswith(
+            'ERROR',
+            na=False,
+        )
+
+        errors_df = self.bids_df.loc[error_filter][[err_column, date_column]]
+        errors_df = errors_df.groupby(
+            [date_column, err_column],
+        ).size().reset_index(name=counts_column)
+
+        column_names = {
+            err_column: 'Error',
+        }
+        errors_df = errors_df.rename(columns=column_names)
+
+        path = f'{self.directory}/output/errors.csv'
+        errors_df.to_csv(path, index=False)
+
+        self.bids_df = self.bids_df.loc[~error_filter]
+
 
     def process_data(self):
         self.setup()
