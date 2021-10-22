@@ -1,0 +1,12 @@
+[tool.poetry]
+name = "travel_meta_recommendation"
+version = "0.1.0"
+description = "Travel Meta Recommendation"
+authors = ["Elena Stupina"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "1.3.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "6.2.5"
