@@ -73,16 +73,21 @@ class TravelMetaRecomendation(object):
             self.bids_path,
             header=None,
             names=self.bids_header,
+            dtype={'MotelID': str},
+            index_col=False,
         )
         rate_df = pd.read_csv(
             self.exchange_rate_path,
             header=None,
             names=self.rate_header,
+            index_col=False,
         )
         motels_df = pd.read_csv(
             self.motels_path,
             header=None,
             names=self.motels_header,
+            dtype={'MotelID': str},
+            index_col=False,
         )
         return bids_df, rate_df, motels_df
 
@@ -155,7 +160,7 @@ class TravelMetaRecomendation(object):
         self.bids_df = pd.melt(
             self.bids_df,
             id_vars=['MotelID', 'BidDate', 'ExchangeRate'],
-            var_name='Country',
+            var_name='Losa',
             value_name='Bid',
         )
 
@@ -164,13 +169,24 @@ class TravelMetaRecomendation(object):
             lambda row: row['Bid'] * row['ExchangeRate'],
             axis=1,
         ).round(3)
+
+    def enrich_bids(self):
+        self.bids_df = self.bids_df.merge(
+            self.motels_df,
+            on='MotelID',
+            how='inner',
+        )
+        self.bids_df = self.bids_df.drop(columns=[
+            'Country',
+            'URL',
+            'Comment',
+        ])
     
     def prepare_bids(self):
         self.filter_and_count_erros_in_bids()
         self.add_eur_rate_to_bids()
         self.transform_bids_columns()
-
-
+        self.enrich_bids()
 
     def process_data(self):
         self.setup()
