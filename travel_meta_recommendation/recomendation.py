@@ -1,15 +1,16 @@
 import os
-
 from argparse import ArgumentParser
 
 import pandas as pd
-
 
 INPUT_DT_FORMAT = '%H-%d-%m-%Y'
 OUTPUT_DT_FORMAT = '%Y-%m-%d-%H:%M'
 
 
 def get_headers():
+    """
+    Get headers for dataframes
+    """
     bids_header = (
         'MotelID',
         'BidDate',
@@ -36,16 +37,25 @@ def get_headers():
 
 
 def str2datetime(df, column_name):
+    """
+    Convert string to datetime
+    """
     df[column_name] =  pd.to_datetime(df[column_name], format=INPUT_DT_FORMAT)
     return df
     
 
 def datetime2str(df, column_name):
+    """
+    Convert datetime to string
+    """
     df[column_name] = df[column_name].dt.strftime(OUTPUT_DT_FORMAT)
     return df
 
 
 def outer_join_without_key(df1, df2):
+    """
+    Join dataframe without index key
+    """
     df1['tmp'] = 1
     df2['tmp'] = 1
     df = df1.merge(df2, on='tmp', how='outer')
@@ -69,6 +79,9 @@ class TravelMetaRecomendation(object):
         self.bids_df, self.rate_df, self.motels_df = self.read_data()
 
     def read_data(self):
+        """
+        Read dataframes from files
+        """
         bids_df = pd.read_csv(
             self.bids_path,
             header=None,
@@ -92,6 +105,9 @@ class TravelMetaRecomendation(object):
         return bids_df, rate_df, motels_df
 
     def filter_and_count_erros_in_bids(self):
+        """
+        Filter and log errors.
+        """
         err_column = 'HU'
         date_column = 'BidDate'
         counts_column = 'Counts'
@@ -117,7 +133,7 @@ class TravelMetaRecomendation(object):
 
     def add_eur_rate_to_bids(self):
         """
-        Adds EUR rates to bid rows
+        Adds euro rates to bid rows
         """
         date_from = 'ValidFrom'
         date_to = 'ValidTo'
@@ -147,6 +163,13 @@ class TravelMetaRecomendation(object):
         ])
     
     def transform_bids_columns(self):
+        """
+        Transform bids columns:
+         * delete extra columns
+         * unpivot losa columns
+         * drop nulls
+         * count bids in euro
+        """
         columns = [
             'MotelID',
             'BidDate',
@@ -171,6 +194,9 @@ class TravelMetaRecomendation(object):
         ).round(3)
 
     def enrich_bids(self):
+        """
+        Enrich bids with motels data
+        """
         self.bids_df = self.bids_df.merge(
             self.motels_df,
             on='MotelID',
@@ -182,15 +208,31 @@ class TravelMetaRecomendation(object):
             'Comment',
         ])
     
+    def define_max_bids(self):
+        """
+        Define maximum prices values
+        """
+        self.bids_df['IsHighestBiD'] = self.bids_df['Bid'] == self.bids_df.groupby([
+            'MotelID',
+            'BidDate',
+        ])['Bid'].transform('max')
+    
     def prepare_bids(self):
+        """
+        Prepare bids
+        """
         self.filter_and_count_erros_in_bids()
         self.add_eur_rate_to_bids()
         self.transform_bids_columns()
-        self.enrich_bids()
 
     def process_data(self):
+        """
+        Process data
+        """
         self.setup()
         self.prepare_bids()
+        self.enrich_bids()
+        self.define_max_bids()
     
     def show_info(self):
         print('bids count: ', self.bids_df.shape[0])
