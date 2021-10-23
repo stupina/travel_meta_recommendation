@@ -6,7 +6,7 @@ import pandas as pd
 
 
 INPUT_DT_FORMAT = '%H-%d-%m-%Y'
-OUTPUT_DT_FORMAT = '%Y-%m-%d-%H'
+OUTPUT_DT_FORMAT = '%Y-%m-%d-%H:%M'
 
 
 def get_headers():
@@ -140,16 +140,48 @@ class TravelMetaRecomendation(object):
             'CurrencyName',
             'CurrencyCode',
         ])
+    
+    def transform_bids_columns(self):
+        columns = [
+            'MotelID',
+            'BidDate',
+            'US',
+            'MX',
+            'CA',
+            'ExchangeRate',
+        ]
+        self.bids_df = self.bids_df[columns]
+
+        self.bids_df = pd.melt(
+            self.bids_df,
+            id_vars=['MotelID', 'BidDate', 'ExchangeRate'],
+            var_name='Country',
+            value_name='Bid',
+        )
+
+        self.bids_df.dropna(subset=['Bid'])
+        self.bids_df['BidEUR'] = self.bids_df.apply(
+            lambda row: row['Bid'] * row['ExchangeRate'],
+            axis=1,
+        ).round(3)
+    
+    def prepare_bids(self):
+        self.filter_and_count_erros_in_bids()
+        self.add_eur_rate_to_bids()
+        self.transform_bids_columns()
+
+
 
     def process_data(self):
         self.setup()
-        self.filter_and_count_erros_in_bids()
-        self.add_eur_rate_to_bids()
+        self.prepare_bids()
     
-    def show_row_count(self):
+    def show_info(self):
         print('bids count: ', self.bids_df.shape[0])
         print('rate count: ', self.rate_df.shape[0])
         print('motels count: ', self.motels_df.shape[0])
+        print('result:\n')
+        print(self.bids_df)
 
 
 def main(bids_path, exchange_rate_path, motels_path):
@@ -159,7 +191,7 @@ def main(bids_path, exchange_rate_path, motels_path):
         motels_path,
     )
     recomendation.process_data()
-    recomendation.show_row_count()
+    recomendation.show_info()
 
 
 if __name__ == '__main__':
