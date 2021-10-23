@@ -5,6 +5,10 @@ from argparse import ArgumentParser
 import pandas as pd
 
 
+INPUT_DT_FORMAT = '%H-%d-%m-%Y'
+OUTPUT_DT_FORMAT = '%Y-%m-%d-%H'
+
+
 def get_headers():
     bids_header = (
         'MotelID',
@@ -29,6 +33,24 @@ def get_headers():
     rate_header = ('ValidFrom', 'CurrencyName', 'CurrencyCode', 'ExchangeRate')
     motels_header = ('MotelID', 'MotelName', 'Country', 'URL', 'Comment')
     return bids_header, rate_header, motels_header
+
+
+def str2datetime(df, column_name):
+    df[column_name] =  pd.to_datetime(df[column_name], format=INPUT_DT_FORMAT)
+    return df
+    
+
+def datetime2str(df, column_name):
+    df[column_name] = df[column_name].dt.strftime(OUTPUT_DT_FORMAT)
+    return df
+
+
+def outer_join_without_key(df1, df2):
+    df1['tmp'] = 1
+    df2['tmp'] = 1
+    df = df1.merge(df2, on='tmp', how='outer')
+    df = df.drop(columns=['tmp'])
+    return df
 
 
 class TravelMetaRecomendation(object):
@@ -88,12 +110,43 @@ class TravelMetaRecomendation(object):
 
         self.bids_df = self.bids_df.loc[~error_filter]
 
+    def add_eur_rate_to_bids(self):
+        """
+        Adds EUR rates to bid rows
+        """
+        date_from = 'ValidFrom'
+        date_to = 'ValidTo'
+        bid_date = 'BidDate'
+        self.rate_df = str2datetime(self.rate_df, date_from)
+        self.bids_df = str2datetime(self.bids_df, bid_date)
+        self.rate_df = datetime2str(self.rate_df, date_from)
+        self.bids_df = datetime2str(self.bids_df, bid_date)
+
+        self.rate_df= self.rate_df.sort_values(
+            by=[date_from],
+            ascending=True,
+        )
+        
+        self.rate_df[date_to] = self.rate_df[date_from].shift(-1)
+
+        self.bids_df = outer_join_without_key(self.bids_df, self.rate_df)
+
+        self.bids_df  = self.bids_df.query(
+            f'{bid_date} >= {date_from} & {bid_date} < {date_to}'
+        )
+        self.bids_df = self.bids_df.drop(columns=[
+            date_from,
+            date_to,
+            'CurrencyName',
+            'CurrencyCode',
+        ])
 
     def process_data(self):
         self.setup()
         self.filter_and_count_erros_in_bids()
+        self.add_eur_rate_to_bids()
     
-    def show(self):
+    def show_row_count(self):
         print('bids count: ', self.bids_df.shape[0])
         print('rate count: ', self.rate_df.shape[0])
         print('motels count: ', self.motels_df.shape[0])
@@ -106,7 +159,7 @@ def main(bids_path, exchange_rate_path, motels_path):
         motels_path,
     )
     recomendation.process_data()
-    recomendation.show()
+    recomendation.show_row_count()
 
 
 if __name__ == '__main__':
